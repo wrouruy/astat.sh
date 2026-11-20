@@ -1,24 +1,46 @@
 #!/usr/bin/env bash
 
-readarray -t el < <(ls --color=no -a)
+load() {
+    local name
 
-for i in "${el[@]}"; do
-    [[ -e "$i" ]] || continue
+    el=(..)
+    while IFS= read -r name; do
+        el+=("$name")
+    done < <(ls -A)
+    n=${#el[@]}
 
-    printf '%s' "$i"
-    [ -d "$i" ] && printf "/"
-    printf "\n"
-done
+    idx=0
+    top=0
+}
 
-n=${#el[@]}
-idx=0
+draw() {
+    local rows visible i name
 
-printf '\033[%dA' "$n"
+    rows=$(tput lines 2>/dev/null) || rows=24
+    visible=$(( rows - 1 ))
+    (( visible > n )) && visible=$n
 
-plain() { printf '\033[2K\r%s' "${el[idx]}"; }
-marked() { printf '\033[2K\r\033[0;47m%s\033[0m' "${el[idx]}"; }
+    (( idx < top ))            && top=$idx
+    (( idx >= top + visible )) && top=$(( idx - visible + 1 ))
 
-marked
+    printf '\033[H'
+
+    for (( i = top; i < top + visible; i++ )); do
+        (( i == idx )) && printf '\033[7m'
+        printf '%s' "${el[i]}"
+        [[ -d "${el[i]}" ]] && printf '/'
+        (( i == idx )) && printf '\033[0m'
+        printf '\033[K\n'
+    done
+
+    printf '\033[J'
+
+    printf '\033[%d;1H\033[K' "$rows"
+    printf '\033[7m %s \033[0m' "$PWD"
+}
+
+load
+draw
 
 while true; do
     IFS= read -rsn1 key || break
@@ -30,28 +52,18 @@ while true; do
 
     case "$key" in
     $'\e[A') # up
-        plain
-        if (( idx > 0 )); then
-            printf '\033[1A'
-            (( idx-- ))
-        else
-            (( idx = n - 1 ))
-            (( n > 1 )) && printf '\033[%dB' $(( n - 1 ))
-        fi
-        marked
+        (( idx = (idx - 1 + n) % n ))
         ;;
     $'\e[B') # down
-        plain
-        if (( idx < n - 1 )); then
-            printf '\033[1B'
-            (( idx++ ))
-        else
-            (( idx = 0 ))
-            (( n > 1 )) && printf '\033[%dA' $(( n - 1 ))
+        (( idx = (idx + 1) % n ))
+        ;;
+    '' | $'\n' | $'\r') # enter
+        if [[ -d "${el[idx]}" ]]; then
+            cd -- "${el[idx]}" || continue
+            load
         fi
-        marked
         ;;
     esac
-done
 
-printf '\n'
+    draw
+done
