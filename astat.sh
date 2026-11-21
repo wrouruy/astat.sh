@@ -42,28 +42,50 @@ draw() {
 load
 draw
 
-while true; do
-    IFS= read -rsn1 key || break
+RUNNING=true
+
+finish() {
+    RUNNING=false
+}
+
+trap finish INT TERM
+
+while [[ "$RUNNING" == true ]]; do
+    key=
+
+    if ! IFS= read -rsn1 -t 0.2 key; then
+        [[ "$RUNNING" == false ]] && break
+        continue
+    fi
 
     if [[ "$key" == $'\e' ]]; then
-        IFS= read -rsn2 rest || break
+        rest=
+        IFS= read -rsn2 -t 0.05 rest
         key+="$rest"
     fi
 
+    [[ "$RUNNING" == false ]] && break
+
     case "$key" in
-    $'\e[A') # up
-        (( idx = (idx - 1 + n) % n ))
-        ;;
-    $'\e[B') # down
-        (( idx = (idx + 1) % n ))
-        ;;
-    '' | $'\n' | $'\r') # enter
-        if [[ -d "${el[idx]}" ]]; then
-            cd -- "${el[idx]}" || continue
-            load
-        fi
-        ;;
+        $'\e[A') # up
+            (( idx = (idx - 1 + n) % n ))
+            ;;
+        $'\e[B') # down
+            (( idx = (idx + 1) % n ))
+            ;;
+        '' | $'\n' | $'\r') # enter
+            if [[ -d "${el[idx]}" ]]; then
+                cd -- "${el[idx]}" || continue
+                load
+            fi
+            ;;
+        q | Q | $'\e') # quit
+            finish
+            ;;
     esac
 
-    draw
+    [[ "$RUNNING" == true ]] && draw
 done
+
+trap - INT TERM
+printf '\033[H\033[J'
