@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 
+prefix=''
+
 load() {
     local name
 
+    # ls -A | grep $prefix
+    # echo $prefix
     el=(..)
     while IFS= read -r name; do
         el+=("$name")
-    done < <(ls -A)
+    done < <(ls -A | grep "$prefix")
     n=${#el[@]}
 
     idx=0
@@ -36,7 +40,7 @@ draw() {
     printf '\033[J'
 
     printf '\033[%d;1H\033[K' "$rows"
-    printf '\033[7m %s \033[0m' "$PWD"
+    printf '\033[7m %s | %s \033[0m' "$PWD" "$prefix"
 }
 
 load
@@ -76,11 +80,20 @@ while [[ "$RUNNING" == true ]]; do
         '' | $'\n' | $'\r') # enter
             if [[ -d "${el[idx]}" ]]; then
                 cd -- "${el[idx]}" || continue
+                prefix=''
                 load
             fi
             ;;
         q | Q | $'\e') # quit
             finish
+            ;;
+        $'\x7f' | $'\b') # backspace
+            [[ "$prefix" == "" ]] || prefix=${prefix::-1}
+            load
+            ;;
+        *)
+            prefix+=$key
+            load
             ;;
     esac
 
