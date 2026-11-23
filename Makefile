@@ -1,4 +1,6 @@
 PREFIX ?= /usr/local
+USER_HOME ?= $(shell getent passwd "$${SUDO_USER:-$${USER}}" | cut -d: -f6)
+BASHRC ?= $(USER_HOME)/.bashrc
 
 install:
 	install -d $(PREFIX)/bin
